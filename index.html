@@ -29,6 +29,8 @@
   }
   input[type=month]::-webkit-date-and-time-value, input[type=time]::-webkit-date-and-time-value { text-align: left; }
   .times input { flex: 1; min-width: 0; }
+  select#month { display: block; width: 100%; max-width: 100%; min-height: 46px; padding: 10px; font-size: 16px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); font-family: inherit; }
   .row { display: flex; gap: 10px; }
   .row > div { flex: 1; }
   .bulk { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
@@ -69,7 +71,7 @@
       <input type="text" id="name" placeholder="例：山田 太郎" autocomplete="name">
       <div style="height:12px"></div>
       <label class="field" for="month">対象の月</label>
-      <input type="month" id="month">
+      <select id="month"></select>
     </div>
 
     <div class="card">
@@ -108,11 +110,18 @@ const $ = (s) => document.querySelector(s);
 const daysEl = $("#days");
 const monthEl = $("#month");
 
-// 初期値：翌月
+// 対象月の選択肢：今月〜3か月先。初期値は翌月
 (function initMonth() {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 1);
-  monthEl.value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  const now = new Date();
+  for (let i = 0; i <= 3; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const val = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    const opt = document.createElement("option");
+    opt.value = val;
+    opt.textContent = d.getFullYear() + "年" + (d.getMonth() + 1) + "月";
+    monthEl.appendChild(opt);
+  }
+  monthEl.selectedIndex = 1;
 })();
 
 function renderDays() {
