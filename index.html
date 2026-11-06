@@ -21,6 +21,14 @@
   input[type=text], input[type=month], input[type=time], textarea {
     width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); font-family: inherit; }
   textarea { min-height: 80px; resize: vertical; }
+  /* iPhone Safariで年月・時刻の入力欄が枠からはみ出るのを防ぐ */
+  input[type=month], input[type=time] {
+    -webkit-appearance: none; appearance: none;
+    display: block; width: 100%; min-width: 0; max-width: 100%;
+    min-height: 46px; text-align: left; margin: 0;
+  }
+  input[type=month]::-webkit-date-and-time-value, input[type=time]::-webkit-date-and-time-value { text-align: left; }
+  .times input { flex: 1; min-width: 0; }
   .row { display: flex; gap: 10px; }
   .row > div { flex: 1; }
   .bulk { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
