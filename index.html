@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>シフト希望提出フォーム</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --text: #1f2933; --sub: #6b7785;
+    --line: #e2e6ea; --primary: #2563eb; --ok: #16a34a; --time: #d97706; --off: #6b7280;
+    --sat: #2563eb; --sun: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif; line-height: 1.5; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 8px 0 4px; }
+  .lead { color: var(--sub); font-size: 13px; margin: 0 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  label.field { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  input[type=text], input[type=month], input[type=time], textarea {
+    width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); font-family: inherit; }
+  textarea { min-height: 80px; resize: vertical; }
+  .row { display: flex; gap: 10px; }
+  .row > div { flex: 1; }
+  .bulk { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .bulk button { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: #fff; cursor: pointer; color: var(--text); }
+  .day { border-top: 1px solid var(--line); padding: 12px 0; }
+  .day:first-child { border-top: none; }
+  .day.error { background: #fef2f2; border-radius: 8px; padding: 12px 8px; }
+  .date { font-weight: 700; margin-bottom: 8px; }
+  .date.sat { color: var(--sat); } .date.sun { color: var(--sun); }
+  .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .choices input { position: absolute; opacity: 0; pointer-events: none; }
+  .choices label { text-align: center; padding: 9px 4px; border: 1px solid var(--line); border-radius: 8px;
+    font-size: 14px; cursor: pointer; background: #fff; user-select: none; }
+  .choices input:checked + label.ok   { background: var(--ok);   border-color: var(--ok);   color: #fff; font-weight: 700; }
+  .choices input:checked + label.time { background: var(--time); border-color: var(--time); color: #fff; font-weight: 700; }
+  .choices input:checked + label.off  { background: var(--off);  border-color: var(--off);  color: #fff; font-weight: 700; }
+  .times { display: none; margin-top: 8px; align-items: center; gap: 8px; }
+  .times.show { display: flex; }
+  .times span { color: var(--sub); }
+  .submit { width: 100%; padding: 14px; font-size: 16px; font-weight: 700; color: #fff; background: var(--primary);
+    border: none; border-radius: 10px; cursor: pointer; }
+  .submit:disabled { opacity: .5; }
+  .msg { padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 12px; display: none; }
+  .msg.err { display: block; background: #fef2f2; color: #991b1b; }
+  .msg.good { display: block; background: #f0fdf4; color: #166534; }
+  pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; background: #f1f5f9; padding: 10px; border-radius: 8px; }
+  .legend { font-size: 12px; color: var(--sub); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>シフト希望提出フォーム</h1>
+  <p class="lead">出勤できる日・休みの日を、日ごとに選んで送信してください。</p>
+
+  <form id="form" novalidate>
+    <div class="card">
+      <label class="field" for="name">お名前</label>
+      <input type="text" id="name" placeholder="例：山田 太郎" autocomplete="name">
+      <div style="height:12px"></div>
+      <label class="field" for="month">対象の月</label>
+      <input type="month" id="month">
+    </div>
+
+    <div class="card">
+      <div class="legend">
+        <b>出れる</b>＝終日OK ／ <b>時間指定</b>＝出れる時間帯を入力 ／ <b>休み</b>＝出勤不可
+      </div>
+      <div class="bulk">
+        <button type="button" data-bulk="ok">未回答をすべて「出れる」</button>
+        <button type="button" data-bulk="off">未回答をすべて「休み」</button>
+        <button type="button" data-bulk="clear">選択をクリア</button>
+      </div>
+      <div id="days"></div>
+    </div>
+
+    <div class="card">
+      <label class="field" for="note">連絡事項（任意）</label>
+      <textarea id="note" placeholder="例：第2週は試験のため早めに上がりたいです"></textarea>
+    </div>
+
+    <button type="submit" class="submit" id="submitBtn">送信する</button>
+    <div id="msg" class="msg"></div>
+  </form>
+</div>
+
+<script>
+// ===== 設定 =====
+// 送信先（Google Apps ScriptのウェブアプリURLなど）。空の間は送信せず内容を画面に表示します。
+const ENDPOINT = "";
+// 時間指定の初期値
+const DEFAULT_START = "10:00";
+const DEFAULT_END = "22:00";
+// ================
+
+const WEEK = ["日","月","火","水","木","金","土"];
+const $ = (s) => document.querySelector(s);
+const daysEl = $("#days");
+const monthEl = $("#month");
+
+// 初期値：翌月
+(function initMonth() {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  monthEl.value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+})();
+
+function renderDays() {
+  const [y, m] = monthEl.value.split("-").map(Number);
+  daysEl.innerHTML = "";
+  if (!y || !m) return;
+  const last = new Date(y, m, 0).getDate();
+  for (let day = 1; day <= last; day++) {
+    const dt = new Date(y, m - 1, day);
+    const w = dt.getDay();
+    const key = `${y}-${String(m).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    const cls = w === 0 ? "sun" : w === 6 ? "sat" : "";
+    const el = document.createElement("div");
+    el.className = "day";
+    el.dataset.date = key;
+    el.innerHTML = `
+      <div class="date ${cls}">${m}/${day}（${WEEK[w]}）</div>
+      <div class="choices">
+        <input type="radio" name="s_${key}" id="ok_${key}" value="ok"><label class="ok" for="ok_${key}">出れる</label>
+        <input type="radio" name="s_${key}" id="time_${key}" value="time"><label class="time" for="time_${key}">時間指定</label>
+        <input type="radio" name="s_${key}" id="off_${key}" value="off"><label class="off" for="off_${key}">休み</label>
+      </div>
+      <div class="times">
+        <input type="time" class="t-start" value="${DEFAULT_START}">
+        <span>〜</span>
+        <input type="time" class="t-end" value="${DEFAULT_END}">
+      </div>`;
+    daysEl.appendChild(el);
+  }
+}
+
+daysEl.addEventListener("change", (e) => {
+  if (e.target.type !== "radio") return;
+  const day = e.target.closest(".day");
+  day.classList.remove("error");
+  day.querySelector(".times").classList.toggle("show", e.target.value === "time");
+});
+
+document.querySelectorAll("[data-bulk]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const mode = btn.dataset.bulk;
+    daysEl.querySelectorAll(".day").forEach((day) => {
+      const checked = day.querySelector("input:checked");
+      if (mode === "clear") {
+        if (checked) checked.checked = false;
+        day.querySelector(".times").classList.remove("show");
+      } else if (!checked) {
+        day.querySelector(`input[value=${mode}]`).checked = true;
+        day.classList.remove("error");
+      }
+    });
+  });
+});
+
+monthEl.addEventListener("change", renderDays);
+renderDays();
+
+function showMsg(text, type, extraHtml) {
+  const m = $("#msg");
+  m.className = "msg " + type;
+  m.innerHTML = text + (extraHtml || "");
+}
+
+$("#form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("#name").value.trim();
+  if (!name) { showMsg("お名前を入力してください。", "err"); $("#name").focus(); return; }
+
+  const entries = [];
+  let firstError = null;
+  daysEl.querySelectorAll(".day").forEach((day) => {
+    const checked = day.querySelector("input:checked");
+    const date = day.dataset.date;
+    if (!checked) { day.classList.add("error"); firstError = firstError || day; return; }
+    const entry = { date, status: checked.value, start: "", end: "" };
+    if (checked.value === "time") {
+      entry.start = day.querySelector(".t-start").value;
+      entry.end = day.querySelector(".t-end").value;
+      if (!entry.start || !entry.end || entry.start >= entry.end) {
+        day.classList.add("error"); firstError = firstError || day; return;
+      }
+    }
+    entries.push(entry);
+  });
+  if (firstError) {
+    showMsg("未回答、または時間の入力に誤りがある日があります（赤くなっている日）。", "err");
+    firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  const payload = {
+    submittedAt: new Date().toISOString(),
+    name,
+    month: monthEl.value,
+    note: $("#note").value.trim(),
+    entries
+  };
+
+  const btn = $("#submitBtn");
+  if (!ENDPOINT) {
+    showMsg("（テスト表示）送信先が未設定のため、送信は行わず内容だけ表示しています。", "good",
+      "<pre>" + JSON.stringify(payload, null, 2).replace(/</g, "&lt;") + "</pre>");
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = "送信中…";
+  try {
+    // Google Apps Script向け：preflightを避けるためtext/plainで送信
+    await fetch(ENDPOINT, { method: "POST", mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+    showMsg("送信しました。ありがとうございました！", "good");
+  } catch (err) {
+    showMsg("送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。", "err");
+  } finally {
+    btn.disabled = false; btn.textContent = "送信する";
+  }
+});
+</script>
+</body>
+</html>
