@@ -30,13 +30,13 @@
   .day.error { background: #fef2f2; border-radius: 8px; padding: 12px 8px; }
   .date { font-weight: 700; margin-bottom: 8px; }
   .date.sat { color: var(--sat); } .date.sun { color: var(--sun); }
-  .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  .choices input { position: absolute; opacity: 0; pointer-events: none; }
-  .choices label { text-align: center; padding: 9px 4px; border: 1px solid var(--line); border-radius: 8px;
-    font-size: 14px; cursor: pointer; background: #fff; user-select: none; }
-  .choices input:checked + label.ok   { background: var(--ok);   border-color: var(--ok);   color: #fff; font-weight: 700; }
-  .choices input:checked + label.time { background: var(--time); border-color: var(--time); color: #fff; font-weight: 700; }
-  .choices input:checked + label.off  { background: var(--off);  border-color: var(--off);  color: #fff; font-weight: 700; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .head .date { margin: 0; white-space: nowrap; }
+  select.status { width: 160px; padding: 10px; font-size: 16px; border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; color: var(--text); font-family: inherit; }
+  select.status[data-v="ok"]   { border-color: var(--ok);   background: #f0fdf4; color: #166534; font-weight: 700; }
+  select.status[data-v="time"] { border-color: var(--time); background: #fffbeb; color: #92400e; font-weight: 700; }
+  select.status[data-v="off"]  { border-color: var(--off);  background: #f3f4f6; color: #374151; font-weight: 700; }
   .times { display: none; margin-top: 8px; align-items: center; gap: 8px; }
   .times.show { display: flex; }
   .times span { color: var(--sub); }
@@ -121,11 +121,14 @@ function renderDays() {
     el.className = "day";
     el.dataset.date = key;
     el.innerHTML = `
-      <div class="date ${cls}">${m}/${day}（${WEEK[w]}）</div>
-      <div class="choices">
-        <input type="radio" name="s_${key}" id="ok_${key}" value="ok"><label class="ok" for="ok_${key}">出れる</label>
-        <input type="radio" name="s_${key}" id="time_${key}" value="time"><label class="time" for="time_${key}">時間指定</label>
-        <input type="radio" name="s_${key}" id="off_${key}" value="off"><label class="off" for="off_${key}">休み</label>
+      <div class="head">
+        <div class="date ${cls}">${m}/${day}（${WEEK[w]}）</div>
+        <select class="status" data-v="">
+          <option value="">選択してください</option>
+          <option value="ok">出れる</option>
+          <option value="time">時間指定</option>
+          <option value="off">休み</option>
+        </select>
       </div>
       <div class="times">
         <input type="time" class="t-start" value="${DEFAULT_START}">
@@ -136,25 +139,26 @@ function renderDays() {
   }
 }
 
-daysEl.addEventListener("change", (e) => {
-  if (e.target.type !== "radio") return;
-  const day = e.target.closest(".day");
+function setStatus(day, v) {
+  const sel = day.querySelector("select.status");
+  sel.value = v;
+  sel.dataset.v = v;
   day.classList.remove("error");
-  day.querySelector(".times").classList.toggle("show", e.target.value === "time");
+  day.querySelector(".times").classList.toggle("show", v === "time");
+}
+
+daysEl.addEventListener("change", (e) => {
+  if (!e.target.matches("select.status")) return;
+  setStatus(e.target.closest(".day"), e.target.value);
 });
 
 document.querySelectorAll("[data-bulk]").forEach((btn) => {
   btn.addEventListener("click", () => {
     const mode = btn.dataset.bulk;
     daysEl.querySelectorAll(".day").forEach((day) => {
-      const checked = day.querySelector("input:checked");
-      if (mode === "clear") {
-        if (checked) checked.checked = false;
-        day.querySelector(".times").classList.remove("show");
-      } else if (!checked) {
-        day.querySelector(`input[value=${mode}]`).checked = true;
-        day.classList.remove("error");
-      }
+      const current = day.querySelector("select.status").value;
+      if (mode === "clear") setStatus(day, "");
+      else if (!current) setStatus(day, mode);
     });
   });
 });
@@ -176,11 +180,11 @@ $("#form").addEventListener("submit", async (e) => {
   const entries = [];
   let firstError = null;
   daysEl.querySelectorAll(".day").forEach((day) => {
-    const checked = day.querySelector("input:checked");
+    const status = day.querySelector("select.status").value;
     const date = day.dataset.date;
-    if (!checked) { day.classList.add("error"); firstError = firstError || day; return; }
-    const entry = { date, status: checked.value, start: "", end: "" };
-    if (checked.value === "time") {
+    if (!status) { day.classList.add("error"); firstError = firstError || day; return; }
+    const entry = { date, status, start: "", end: "" };
+    if (status === "time") {
       entry.start = day.querySelector(".t-start").value;
       entry.end = day.querySelector(".t-end").value;
       if (!entry.start || !entry.end || entry.start >= entry.end) {
