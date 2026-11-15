@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>スタッフ登録</title>
+<style>
+  body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;padding:20px;background:#f5f5f5;color:#222}
+  .card{max-width:420px;margin:0 auto;background:#fff;border-radius:12px;padding:20px}
+  h1{font-size:18px;margin:0 0 16px}
+  label{display:block;font-size:14px;margin:14px 0 6px}
+  input{width:100%;box-sizing:border-box;padding:12px;font-size:16px;border:1px solid #ccc;border-radius:8px}
+  button{width:100%;margin-top:22px;padding:14px;font-size:16px;color:#fff;background:#06c755;border:0;border-radius:8px}
+  button:disabled{opacity:.5}
+  #msg{margin-top:14px;font-size:14px}
+  .err{color:#d33}.ok{color:#06a047}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>スタッフ登録</h1>
+  <form id="f">
+    <label>お名前</label>
+    <input id="name" required autocomplete="name">
+    <label>従業員番号</label>
+    <input id="empNo" required inputmode="text" pattern="[A-Za-z0-9]+" title="半角英数字で入力してください" autocapitalize="off">
+    <label>電話番号</label>
+    <input id="phone" type="tel" required inputmode="numeric" pattern="[0-9]{10,11}" maxlength="11" title="ハイフンなしの半角数字10〜11桁" placeholder="09012345678">
+    <button id="btn" type="submit">登録する</button>
+  </form>
+  <div id="msg"></div>
+</div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+const LIFF_ID = 'ここにLIFF ID';
+const GAS_URL = 'ここにGASのウェブアプリURL';
+const $ = id => document.getElementById(id);
+
+liff.init({ liffId: LIFF_ID }).then(() => {
+  if (!liff.isLoggedIn()) liff.login();
+}).catch(e => { $('msg').className='err'; $('msg').textContent='初期化に失敗しました: '+e; });
+
+$('f').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const n=$('name').value.trim(), e=$('empNo').value.trim(), p=$('phone').value.trim();
+  if(!n||!e||!p){ $('msg').className='err'; $('msg').textContent='すべての項目を入力してください'; return; }
+  if(!/^[A-Za-z0-9]+$/.test(e)){ $('msg').className='err'; $('msg').textContent='従業員番号は半角英数字で入力してください'; return; }
+  if(!/^[0-9]{10,11}$/.test(p)){ $('msg').className='err'; $('msg').textContent='電話番号はハイフンなしの半角数字で入力してください'; return; }
+  $('btn').disabled = true; $('msg').textContent = '送信中...'; $('msg').className = '';
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // プリフライト回避
+      body: JSON.stringify({
+        name: $('name').value, empNo: $('empNo').value, phone: $('phone').value,
+        idToken: liff.getIDToken()
+      })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error);
+    $('msg').className = 'ok'; $('msg').textContent = '登録が完了しました。';
+    setTimeout(() => liff.closeWindow(), 1500);
+  } catch (e) {
+    $('msg').className = 'err'; $('msg').textContent = 'エラー: ' + e.message;
+    $('btn').disabled = false;
+  }
+});
+</script>
+</body>
+</html>
