@@ -104,6 +104,22 @@ function paint(d) {
   box.classList.toggle('todo', !s.type);
 }
 
+// 提出済みの回答があれば、フォームに入れた状態にする
+function applyAnswers(answers) {
+  if (!Array.isArray(answers) || answers.length !== DAYS) return false;
+  answers.forEach((a, i) => {
+    if (!a || !a.type) return;
+    const d = i + 1, box = $('d' + d);
+    state[d] = { type: a.type, start: a.start || '10:00', end: a.end || '19:00' };
+    if (a.type === '時間指定') {
+      box.querySelector('.st').value = state[d].start;
+      box.querySelector('.en').value = state[d].end;
+    }
+    paint(d);
+  });
+  return true;
+}
+
 function pad(n){ return String(n).padStart(2, '0'); }
 
 async function call(payload) {
@@ -119,11 +135,13 @@ async function call(payload) {
   try {
     await liff.init({ liffId: LIFF_ID });
     if (!liff.isLoggedIn()) { liff.login(); return; }
-    const r = await call({ action: 'whoami' });
+    const r = await call({ action: 'whoami', month: MONTH });
     if (!r.ok) throw new Error(r.error);
-    $('sub').textContent = r.name + ' さん / ' + Y + '年' + M + '月分（全ての日を選んでください）';
     $('title').textContent = M + '月の希望シフト';
     render();
+    const done = applyAnswers(r.answers);
+    $('sub').textContent = r.name + ' さん / ' + Y + '年' + M + '月分' +
+      (done ? '（提出済み。内容を直して再提出できます）' : '（全ての日を選んでください）');
     $('submit').disabled = false;
   } catch (e) {
     $('sub').textContent = '';
